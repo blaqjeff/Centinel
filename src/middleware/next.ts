@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getChallengeDetails, matchPath } from '../core/policy';
+import { CentinelConfig } from '../core/types';
+import { getChallengeDetailsFromConfig, matchPath } from '../core/matcher';
 
 /**
  * Edge-compatible JWT verification using the native Web Crypto API.
@@ -263,11 +264,16 @@ async function verifyBaseEdge(
 /**
  * Next.js Edge Middleware for Centinel x402.
  */
-export async function nextCentinel(req: NextRequest) {
+export async function nextCentinel(req: NextRequest, config?: CentinelConfig) {
+  if (!config) {
+    throw new Error(
+      'Centinel Next.js Middleware requires the centinel.config.json object to be passed as the second argument: nextCentinel(request, config)'
+    );
+  }
   const requestedPath = req.nextUrl.pathname;
 
   // 1. Check if path is protected
-  const challenge = getChallengeDetails(requestedPath);
+  const challenge = getChallengeDetailsFromConfig(config, requestedPath);
   if (!challenge) {
     return NextResponse.next();
   }

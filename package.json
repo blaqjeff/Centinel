@@ -7,6 +7,16 @@
   "bin": {
     "centinel": "./dist/cli/init.js"
   },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./next": {
+      "types": "./dist/middleware/next.d.ts",
+      "default": "./dist/middleware/next.js"
+    }
+  },
   "scripts": {
     "build": "tsc",
     "start": "ts-node src/index.ts",

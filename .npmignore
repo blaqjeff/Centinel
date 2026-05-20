@@ -1,0 +1,9 @@
+# .npmignore
+demo/
+src/
+tsconfig.json
+.env
+.env.example
+.git
+.github
+*.log

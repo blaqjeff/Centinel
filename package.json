@@ -1,0 +1,47 @@
+{
+  "name": "@ejemo/centinel",
+  "version": "1.0.0",
+  "description": "A low-code framework to monetize bot and AI agent traffic using HTTP 402 Payment Required status code.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "centinel": "./dist/cli/init.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "ts-node src/index.ts",
+    "demo:server": "ts-node demo/server.ts",
+    "demo:agent": "ts-node demo/agent.ts"
+  },
+  "keywords": [
+    "x402",
+    "solana",
+    "base",
+    "paywall",
+    "micropayments",
+    "middleware",
+    "agentic-web"
+  ],
+  "author": "Ejemo Tech",
+  "license": "MIT",
+  "dependencies": {
+    "@solana/spl-token": "^0.4.3",
+    "@solana/web3.js": "^1.91.0",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.11.1",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.7",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/node": "^20.12.7",
+    "next": "^16.2.6",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  }
+}

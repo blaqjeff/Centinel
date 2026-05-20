@@ -173,7 +173,21 @@ function init() {
     }
   }
 
-  // ── Step 3: Framework-specific middleware scaffolding ─────────────────────
+  // ── Step 3: Check tsconfig.json for resolveJsonModule ────────────────────
+  if (framework.usesTypescript && framework.name === 'nextjs') {
+    const tsconfigPath = path.join(targetDir, 'tsconfig.json');
+    try {
+      const tsconfigRaw = fs.readFileSync(tsconfigPath, 'utf-8');
+      if (!tsconfigRaw.includes('resolveJsonModule')) {
+        console.log('   ⚠️  tsconfig.json may need "resolveJsonModule": true for JSON imports.');
+        console.log('      Add it under "compilerOptions" if you get import errors.');
+      }
+    } catch {
+      // tsconfig.json not readable, skip check
+    }
+  }
+
+  // ── Step 4: Framework-specific middleware scaffolding ─────────────────────
   if (framework.name === 'nextjs') {
     scaffoldNextMiddleware(targetDir, framework);
   } else if (framework.name === 'express') {

@@ -29,11 +29,15 @@ export async function verifyPayment(
     return { success: false, error: 'Transaction signature has already been used' };
   }
 
-  // Support Mock verification for rapid development and E2E offline testing
+  // Mock signatures — only allowed in non-production environments
   if (signature.startsWith('mock_')) {
-    console.log(`[Centinel] Verified signature using MOCK mode: ${signature}`);
-    verifiedSignaturesCache.add(signature);
-    return { success: true };
+    const allowMock = process.env.NODE_ENV !== 'production' || process.env.CENTINEL_ALLOW_MOCK === 'true';
+    if (allowMock) {
+      console.log(`[Centinel] ⚠️ Mock signature accepted (dev mode): ${signature}`);
+      verifiedSignaturesCache.add(signature);
+      return { success: true };
+    }
+    return { success: false, error: 'Mock signatures are not allowed in production. Set CENTINEL_ALLOW_MOCK=true to override.' };
   }
 
   try {

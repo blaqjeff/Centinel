@@ -304,20 +304,24 @@ export async function nextCentinel(req: NextRequest, config?: CentinelConfig) {
   const paymentChain = req.headers.get('x-payment-chain')?.toLowerCase();
 
   if (paymentSignature && (paymentChain === 'solana' || paymentChain === 'base')) {
-    // Check mock signature
+    // Mock signatures — only allowed in non-production environments
     if (paymentSignature.startsWith('mock_')) {
-      console.log(`[Centinel Edge] Verified mock signature: ${paymentSignature}`);
-      const res = NextResponse.next();
-      if (challenge.model === 'per_session') {
-        const sessionToken = await signJwtEdge(
-          { pathPattern: requestedPath, signature: paymentSignature, chain: paymentChain },
-          JWT_SECRET,
-          challenge.duration || '1h'
-        );
-        res.cookies.set('x-centinel-proof', sessionToken, { path: '/', httpOnly: true });
-        res.headers.set('X-Centinel-Proof', sessionToken);
+      const allowMock = process.env.NODE_ENV !== 'production' || process.env.CENTINEL_ALLOW_MOCK === 'true';
+      if (allowMock) {
+        console.log(`[Centinel Edge] ⚠️ Mock signature accepted (dev mode): ${paymentSignature}`);
+        const res = NextResponse.next();
+        if (challenge.model === 'per_session') {
+          const sessionToken = await signJwtEdge(
+            { pathPattern: requestedPath, signature: paymentSignature, chain: paymentChain },
+            JWT_SECRET,
+            challenge.duration || '1h'
+          );
+          res.cookies.set('x-centinel-proof', sessionToken, { path: '/', httpOnly: true });
+          res.headers.set('X-Centinel-Proof', sessionToken);
+        }
+        return res;
       }
-      return res;
+      // In production, mock signatures are rejected — fall through to 402
     }
 
     const wallet = paymentChain === 'solana' ? challenge.solanaWallet : challenge.baseWallet;
@@ -351,8 +355,20 @@ export async function nextCentinel(req: NextRequest, config?: CentinelConfig) {
 
   // 4. Return 402 challenge
   const price = challenge.price;
-  const solanaWallet = challenge.solanaWallet || '';
-  const baseWallet = challenge.baseWallet || '';
+  const isPlaceholder = (w: string) => /YOUR_|PLACEHOLDER/i.test(w);
+  const solanaWallet = challenge.solanaWallet && !isPlaceholder(challenge.solanaWallet) ? challenge.solanaWallet : '';
+  const baseWallet = challenge.baseWallet && !isPlaceholder(challenge.baseWallet) ? challenge.baseWallet : '';
+
+  // If both wallets are still placeholders, return a config error
+  if (!solanaWallet && !baseWallet) {
+    return new NextResponse(
+      JSON.stringify({
+        error: 'Centinel Configuration Error',
+        message: 'No wallet addresses configured. Please edit centinel.config.json and replace the placeholder wallet addresses.',
+      }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
 
   let authHeader = `x402`;
   const options: string[] = [];
@@ -387,6 +403,9 @@ export async function nextCentinel(req: NextRequest, config?: CentinelConfig) {
   responseHeaders.set('X-402-Model', challenge.model);
   if (challenge.duration) responseHeaders.set('X-402-Duration', challenge.duration);
   responseHeaders.set('Content-Type', 'application/json');
+  responseHeaders.set('Access-Control-Allow-Origin', '*');
+  responseHeaders.set('Access-Control-Allow-Headers', 'X-Payment-Signature, X-Payment-Chain, X-Centinel-Proof, Authorization, Content-Type');
+  responseHeaders.set('Access-Control-Expose-Headers', 'WWW-Authenticate, X-402-Price, X-402-Solana-Address, X-402-Base-Address, X-402-Model, X-402-Duration, X-Centinel-Proof');
 
   return new NextResponse(JSON.stringify(responseBody), {
     status: 402,

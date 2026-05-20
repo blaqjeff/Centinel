@@ -108,8 +108,17 @@ export function centinelExpress() {
  */
 function send402Challenge(res: Response, challenge: any) {
   const price = challenge.price;
-  const solanaWallet = challenge.solanaWallet || '';
-  const baseWallet = challenge.baseWallet || '';
+  const isPlaceholder = (w: string) => /YOUR_|PLACEHOLDER/i.test(w);
+  const solanaWallet = challenge.solanaWallet && !isPlaceholder(challenge.solanaWallet) ? challenge.solanaWallet : '';
+  const baseWallet = challenge.baseWallet && !isPlaceholder(challenge.baseWallet) ? challenge.baseWallet : '';
+
+  // If both wallets are still placeholders, return a config error
+  if (!solanaWallet && !baseWallet) {
+    return res.status(500).json({
+      error: 'Centinel Configuration Error',
+      message: 'No wallet addresses configured. Please edit centinel.config.json and replace the placeholder wallet addresses.',
+    });
+  }
 
   // Standard WWW-Authenticate header for L402 / x402 specifications
   let authHeader = `x402`;

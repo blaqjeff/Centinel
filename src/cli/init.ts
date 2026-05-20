@@ -54,11 +54,12 @@ export async function middleware(request: NextRequest) {
   return await nextCentinel(request, centinelConfig);
 }
 
+// Centinel runs on all routes and checks centinel.config.json to decide
+// which paths require payment. No need to list paths here — just edit
+// centinel.config.json to add, remove, or change protected routes.
 export const config = {
   matcher: [
-    // Add your protected routes here — these should match paths in centinel.config.json
-    '/api/scraped-data',
-    '/premium-tools/:path*'
+    '/((?!_next/static|_next/image|favicon.ico|.*\\\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
   ],
 };
 `;
@@ -72,11 +73,12 @@ export async function middleware(request) {
   return await nextCentinel(request, centinelConfig);
 }
 
+// Centinel runs on all routes and checks centinel.config.json to decide
+// which paths require payment. No need to list paths here — just edit
+// centinel.config.json to add, remove, or change protected routes.
 export const config = {
   matcher: [
-    // Add your protected routes here — these should match paths in centinel.config.json
-    '/api/scraped-data',
-    '/premium-tools/:path*'
+    '/((?!_next/static|_next/image|favicon.ico|.*\\\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
   ],
 };
 `;

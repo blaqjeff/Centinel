@@ -146,6 +146,7 @@ function init() {
         duration: '1h',
       },
     ],
+    maxTransactionAge: 300,
   };
 
   if (!fs.existsSync(configPath)) {

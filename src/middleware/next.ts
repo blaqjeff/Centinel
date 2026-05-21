@@ -108,9 +108,11 @@ async function verifySolanaEdge(
   signature: string,
   price: string,
   wallet: string,
-  rpcUrl: string
+  rpcUrl: string,
+  maxTransactionAge: number = 300
 ): Promise<boolean> {
   const expectedAmount = parseFloat(price);
+  const nowSeconds = Math.floor(Date.now() / 1000);
 
   for (let i = 0; i < 3; i++) {
     try {
@@ -133,6 +135,12 @@ async function verifySolanaEdge(
 
       const tx = data.result;
       if (tx.meta?.err) return false;
+
+      // Replay Protection: Check transaction age
+      if (tx.blockTime) {
+        const ageSeconds = nowSeconds - tx.blockTime;
+        if (ageSeconds > maxTransactionAge || ageSeconds < -60) return false;
+      }
 
       // Scan Instructions
       const instructions = tx.transaction?.message?.instructions || [];
@@ -186,9 +194,11 @@ async function verifyBaseEdge(
   txHash: string,
   price: string,
   wallet: string,
-  rpcUrl: string
+  rpcUrl: string,
+  maxTransactionAge: number = 300
 ): Promise<boolean> {
   const expectedAmount = parseFloat(price);
+  const nowSeconds = Math.floor(Date.now() / 1000);
 
   for (let i = 0; i < 3; i++) {
     try {
@@ -229,6 +239,30 @@ async function verifyBaseEdge(
         return false;
       }
 
+      // 3. Replay Protection: Check block timestamp
+      if (tx.blockNumber) {
+        try {
+          const blockRes = await fetch(rpcUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: 1,
+              method: 'eth_getBlockByNumber',
+              params: [tx.blockNumber, false],
+            }),
+          });
+          const blockData = await blockRes.json();
+          if (blockData?.result?.timestamp) {
+            const blockTimestamp = parseInt(blockData.result.timestamp, 16);
+            const ageSeconds = nowSeconds - blockTimestamp;
+            if (ageSeconds > maxTransactionAge || ageSeconds < -60) return false;
+          }
+        } catch {
+          // If block fetch fails, skip age check (don't block legitimate payments)
+        }
+      }
+
       // ETH transfer check
       if (tx.value !== '0x0' && (!tx.input || tx.input === '0x')) {
         const valueETH = parseInt(tx.value, 16) / 1e18;
@@ -239,14 +273,12 @@ async function verifyBaseEdge(
 
       // ERC20/USDC transfer check (method signature for transfer(address,uint256) is 0xa9059cbb)
       if (tx.input && tx.input.startsWith('0xa9059cbb')) {
-        // Parse recipient and value from input data
-        // 0xa9059cbb + 32 bytes address + 32 bytes value
         const cleanInput = tx.input.slice(10);
         const toHex = '0x' + cleanInput.slice(24, 64);
         const valHex = '0x' + cleanInput.slice(64, 128);
 
         const recipient = toHex.toLowerCase();
-        const receivedUSDC = parseInt(valHex, 16) / 1e6; // USDC has 6 decimals
+        const receivedUSDC = parseInt(valHex, 16) / 1e6;
 
         if (recipient === wallet.toLowerCase() && receivedUSDC >= expectedAmount) {
           return true;
@@ -329,10 +361,12 @@ export async function nextCentinel(req: NextRequest, config?: CentinelConfig) {
       ? (process.env.SOLANA_RPC_URL || 'https://api.devnet.solana.com')
       : (process.env.BASE_RPC_URL || 'https://sepolia.base.org');
 
+
     if (wallet) {
+      const maxAge = config.maxTransactionAge ?? 300;
       const verified = paymentChain === 'solana'
-        ? await verifySolanaEdge(paymentSignature, challenge.price, wallet, rpcUrl)
-        : await verifyBaseEdge(paymentSignature, challenge.price, wallet, rpcUrl);
+        ? await verifySolanaEdge(paymentSignature, challenge.price, wallet, rpcUrl, maxAge)
+        : await verifyBaseEdge(paymentSignature, challenge.price, wallet, rpcUrl, maxAge);
 
       if (verified) {
         console.log(`[Centinel Edge] Signature verified: ${paymentSignature}`);

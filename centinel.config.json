@@ -15,5 +15,6 @@
       "model": "per_session",
       "duration": "1h"
     }
-  ]
+  ],
+  "maxTransactionAge": 300
 }

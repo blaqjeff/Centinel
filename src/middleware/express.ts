@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { getChallengeDetails, matchPath } from '../core/policy';
+import { getChallengeDetails, matchPath, loadConfig } from '../core/policy';
 import { verifyPayment } from '../core/verifier';
 import { generateSessionToken, verifySessionToken } from '../core/token';
 
@@ -72,7 +72,9 @@ export function centinelExpress() {
       }
 
       console.log(`[Centinel] Verifying payment signature: ${paymentSignature} on ${paymentChain}...`);
-      const verification = await verifyPayment(paymentSignature, paymentChain, challenge.price, wallet);
+      const config = loadConfig();
+      const maxAge = config.maxTransactionAge ?? 300;
+      const verification = await verifyPayment(paymentSignature, paymentChain, challenge.price, wallet, maxAge);
       
       if (verification.success) {
         console.log(`[Centinel] Verification successful! Unlocking path: ${requestedPath}`);

@@ -15,16 +15,21 @@ const BASE_RPC_URL = process.env.BASE_RPC_URL || 'https://sepolia.base.org';
 const BASE_USDC_SEPOLIA = '0x036CbD53842c5426634e7929541eC2318f3dCF7e';
 const BASE_USDC_MAINNET = '0x833589fCD6eDb6E08f4c7C32D4f71b54bda02913';
 
+// Default max transaction age: 5 minutes
+const DEFAULT_MAX_TX_AGE = 300;
+
 /**
  * Verifies a payment signature/hash on the specified blockchain.
+ * @param maxTransactionAge - Max allowed age of the transaction in seconds (default: 300).
  */
 export async function verifyPayment(
   signature: string,
   chain: 'solana' | 'base',
-  expectedPrice: string, // numeric string, e.g. "0.01"
-  recipientWallet: string
+  expectedPrice: string,
+  recipientWallet: string,
+  maxTransactionAge: number = DEFAULT_MAX_TX_AGE
 ): Promise<VerificationResult> {
-  // Prevent double-spending / replay attacks
+  // Prevent double-spending / replay attacks (in-memory layer)
   if (verifiedSignaturesCache.has(signature)) {
     return { success: false, error: 'Transaction signature has already been used' };
   }
@@ -42,9 +47,9 @@ export async function verifyPayment(
 
   try {
     if (chain === 'solana') {
-      return await verifySolanaPayment(signature, expectedPrice, recipientWallet);
+      return await verifySolanaPayment(signature, expectedPrice, recipientWallet, maxTransactionAge);
     } else if (chain === 'base') {
-      return await verifyBasePayment(signature, expectedPrice, recipientWallet);
+      return await verifyBasePayment(signature, expectedPrice, recipientWallet, maxTransactionAge);
     } else {
       return { success: false, error: `Unsupported blockchain chain: ${chain}` };
     }
@@ -52,6 +57,31 @@ export async function verifyPayment(
     console.error(`[Centinel] Verification failed for ${chain} tx ${signature}:`, err);
     return { success: false, error: `Verification failed: ${err.message}` };
   }
+}
+
+/**
+ * Checks if a transaction's block timestamp is within the allowed age window.
+ */
+function checkTransactionAge(blockTimestamp: number, maxAgeSeconds: number): VerificationResult | null {
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const ageSeconds = nowSeconds - blockTimestamp;
+
+  if (ageSeconds > maxAgeSeconds) {
+    return {
+      success: false,
+      error: `Transaction too old. Age: ${ageSeconds}s, max allowed: ${maxAgeSeconds}s. Submit a fresh transaction.`,
+    };
+  }
+
+  // Reject transactions that claim to be from the future (clock skew tolerance: 60s)
+  if (ageSeconds < -60) {
+    return {
+      success: false,
+      error: `Transaction timestamp is in the future. Possible clock manipulation.`,
+    };
+  }
+
+  return null; // Age is valid
 }
 
 /**
@@ -63,7 +93,8 @@ export async function verifyPayment(
 async function verifySolanaPayment(
   signature: string,
   expectedPrice: string,
-  recipientWallet: string
+  recipientWallet: string,
+  maxTransactionAge: number
 ): Promise<VerificationResult> {
   const connection = new Connection(SOLANA_RPC_URL, 'confirmed');
   
@@ -84,6 +115,12 @@ async function verifySolanaPayment(
 
   if (tx.meta?.err) {
     return { success: false, error: 'Transaction failed on-chain' };
+  }
+
+  // ── Replay Protection: Check transaction age ──
+  if (tx.blockTime) {
+    const ageCheck = checkTransactionAge(tx.blockTime, maxTransactionAge);
+    if (ageCheck) return ageCheck;
   }
 
   const expectedAmount = parseFloat(expectedPrice);
@@ -175,7 +212,8 @@ async function verifySolanaPayment(
 async function verifyBasePayment(
   txHash: string,
   expectedPrice: string,
-  recipientWallet: string
+  recipientWallet: string,
+  maxTransactionAge: number
 ): Promise<VerificationResult> {
   const provider = new ethers.JsonRpcProvider(BASE_RPC_URL);
 
@@ -197,6 +235,19 @@ async function verifyBasePayment(
 
   if (receipt.status !== 1) {
     return { success: false, error: 'Transaction failed on-chain' };
+  }
+
+  // ── Replay Protection: Check transaction age via block timestamp ──
+  if (tx.blockNumber) {
+    try {
+      const block = await provider.getBlock(tx.blockNumber);
+      if (block && block.timestamp) {
+        const ageCheck = checkTransactionAge(block.timestamp, maxTransactionAge);
+        if (ageCheck) return ageCheck;
+      }
+    } catch {
+      // If we can't get the block, skip age check (don't block legitimate payments)
+    }
   }
 
   const expectedAmount = parseFloat(expectedPrice);

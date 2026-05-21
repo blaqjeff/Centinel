@@ -114,7 +114,7 @@ export default function Home() {
   }, [runSequence]);
 
   return (
-    <main style={{ minHeight: "100vh" }}>
+    <main style={{ minHeight: "100vh", overflowX: "hidden" }}>
       <div className="hero-gradient" />
 
       {/* Hero Section */}

@@ -29,6 +29,7 @@ Centinel is a low-code middleware framework that lets developers charge AI agent
 - ⚡ **Multi-chain** — Accepts SOL, ETH, and USDC on Solana and Base
 - 🔧 **Zero-config** — `npx centinel init` scaffolds everything
 - 🛡️ **Replay protection** — Transaction age verification + in-memory deduplication
+- 🚦 **Rate limiting** — Built-in DDoS protection for verification endpoints
 - 🌐 **Framework support** — Next.js (Edge Runtime) and Express
 - 🔑 **Session tokens** — Pay once, access for a duration (JWT-based)
 - 📋 **Single source of truth** — All config in one `centinel.config.json` file
@@ -260,6 +261,19 @@ After successful payment, the session token is returned as:
 
 ```bash
 npm test
+```
+
+### Local Demo
+
+You can find a complete, runnable Express backend and AI Agent testing script inside the `examples/express-server` folder.
+
+```bash
+cd examples/express-server
+# Start the server
+npx ts-node server.ts
+
+# In another terminal, run the agent
+npx ts-node agent.ts
 ```
 
 ---

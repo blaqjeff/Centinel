@@ -156,19 +156,28 @@ function init() {
     console.log('   ℹ️  centinel.config.json already exists. Skipping.');
   }
 
-  // ── Step 2: Inject JWT_SECRET into .env ──────────────────────────────────
+  // ── Step 2: Inject JWT_SECRET & RPC URLs into .env ──────────────────────────────────
   const envPath = path.join(targetDir, '.env');
   const secureSecret = crypto.randomBytes(32).toString('hex');
-  const jwtSecretBlock = `\n# Centinel Session JWT Key\nJWT_SECRET="${secureSecret}"\n`;
+  const envBlock = `
+# Centinel Session JWT Key
+JWT_SECRET="${secureSecret}"
+
+# Centinel RPC Endpoints (Optional)
+# If left blank, Centinel falls back to public mainnet nodes.
+# Uncomment and replace with your own reliable RPC URLs for production.
+# SOLANA_RPC_URL="https://api.mainnet-beta.solana.com"
+# BASE_RPC_URL="https://mainnet.base.org"
+`;
 
   if (!fs.existsSync(envPath)) {
-    fs.writeFileSync(envPath, `JWT_SECRET="${secureSecret}"\n`, 'utf-8');
-    console.log('   ✅ Created .env with JWT_SECRET');
+    fs.writeFileSync(envPath, envBlock.trim() + '\n', 'utf-8');
+    console.log('   ✅ Created .env with JWT_SECRET and RPC config');
   } else {
     const envContent = fs.readFileSync(envPath, 'utf-8');
     if (!envContent.includes('JWT_SECRET')) {
-      fs.appendFileSync(envPath, jwtSecretBlock, 'utf-8');
-      console.log('   ✅ Appended JWT_SECRET to .env');
+      fs.appendFileSync(envPath, '\n' + envBlock.trim() + '\n', 'utf-8');
+      console.log('   ✅ Appended JWT_SECRET and RPC config to .env');
     } else {
       console.log('   ℹ️  JWT_SECRET already defined in .env. Skipping.');
     }

@@ -390,8 +390,8 @@ export async function nextCentinel(req: NextRequest, config?: CentinelConfig) {
 
     const wallet = paymentChain === 'solana' ? challenge.solanaWallet : challenge.baseWallet;
     const rpcUrl = paymentChain === 'solana'
-      ? (process.env.SOLANA_RPC_URL || 'https://api.devnet.solana.com')
-      : (process.env.BASE_RPC_URL || 'https://sepolia.base.org');
+      ? (process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com')
+      : (process.env.BASE_RPC_URL || 'https://mainnet.base.org');
 
 
     if (wallet) {

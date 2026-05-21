@@ -8,8 +8,8 @@ dotenv.config();
 // In-memory cache to prevent transaction signature replay attacks
 const verifiedSignaturesCache = new Set<string>();
 
-const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || 'https://api.devnet.solana.com';
-const BASE_RPC_URL = process.env.BASE_RPC_URL || 'https://sepolia.base.org';
+const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+const BASE_RPC_URL = process.env.BASE_RPC_URL || 'https://mainnet.base.org';
 
 // USDC Contract Addresses
 const BASE_USDC_SEPOLIA = '0x036CbD53842c5426634e7929541eC2318f3dCF7e';

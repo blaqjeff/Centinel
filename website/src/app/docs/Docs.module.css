@@ -1,0 +1,366 @@
+.container {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  min-height: calc(100vh - 64px);
+  position: relative;
+}
+
+@media (max-width: 1024px) {
+  .container {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Sidebar Styling */
+.sidebar {
+  position: sticky;
+  top: 64px;
+  height: calc(100vh - 64px);
+  padding: 40px 24px;
+  border-right: 1px solid var(--border-color);
+  background: rgba(13, 17, 26, 0.4);
+  backdrop-filter: blur(8px);
+  overflow-y: auto;
+}
+
+@media (max-width: 1024px) {
+  .sidebar {
+    position: relative;
+    top: 0;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
+    padding: 24px;
+  }
+}
+
+.sidebarTitle {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+.sidebarList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+@media (max-width: 1024px) {
+  .sidebarList {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}
+
+.sidebarItem {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-left: 2px solid transparent;
+}
+
+.sidebarItem:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.sidebarItemActive {
+  color: var(--primary);
+  background: rgba(99, 102, 241, 0.05);
+  border-left-color: var(--primary);
+  font-weight: 600;
+}
+
+/* Main Content Styling */
+.contentArea {
+  padding: 40px 60px 80px;
+  max-width: 900px;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .contentArea {
+    padding: 30px 24px;
+  }
+}
+
+/* LLM Export Bar */
+.llmBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  background: rgba(99, 102, 241, 0.04);
+  border: 1px solid rgba(99, 102, 241, 0.15);
+  border-radius: 12px;
+  margin-bottom: 40px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 640px) {
+  .llmBar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+.llmText {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.llmText strong {
+  color: var(--text-primary);
+}
+
+.llmBtnGroup {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .llmBtnGroup {
+    width: 100%;
+  }
+}
+
+/* Section typography and elements */
+.section {
+  display: none;
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sectionActive {
+  display: block;
+}
+
+.docTitle {
+  font-size: 2.5rem;
+  margin-bottom: 16px;
+  color: var(--text-primary);
+  letter-spacing: -0.03em;
+}
+
+.docSubtitle {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  margin-bottom: 32px;
+  line-height: 1.6;
+}
+
+.section h2 {
+  font-size: 1.6rem;
+  margin: 40px 0 16px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 8px;
+}
+
+.section h3 {
+  font-size: 1.15rem;
+  margin: 28px 0 12px;
+  color: var(--text-primary);
+}
+
+.section p {
+  margin-bottom: 16px;
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.section ul, .section ol {
+  margin-bottom: 24px;
+  padding-left: 20px;
+  color: var(--text-secondary);
+}
+
+.section li {
+  margin-bottom: 8px;
+  line-height: 1.65;
+}
+
+/* Table Styling */
+.tableWrapper {
+  overflow-x: auto;
+  margin: 24px 0;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.88rem;
+}
+
+.table th, .table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.table th {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.table td {
+  color: var(--text-secondary);
+  background: rgba(13, 17, 26, 0.2);
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+/* Inline Code highlights */
+.inlineCode {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #a5b4fc;
+}
+
+/* ═══════ IDE-Style Code Blocks ═══════ */
+
+.codeBlockWrapper {
+  position: relative;
+  margin: 24px 0;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  background: #1e1e2e;
+  overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+}
+
+.codeBlockHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: #181825;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.codeBlockDots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.codeBlockFilename {
+  margin-left: 12px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.codeBlockBody {
+  padding: 18px 18px 18px 18px;
+  overflow-x: auto;
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: #abb2bf;
+  counter-reset: line;
+}
+
+.codeBlockBody code {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* Line numbers — hidden by default, generated via the wrapper */
+.codeBlockLineNumbers {
+  display: none; /* Line numbers are aesthetic but can clutter small blocks */
+}
+
+.copyCodeBtn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.copyCodeBtn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* ═══════ Prev / Next Navigation ═══════ */
+
+.sectionNav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 60px;
+  padding-top: 32px;
+  border-top: 1px solid var(--border-color);
+  gap: 16px;
+}
+
+.navPrev,
+.navNext {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.navPrev:hover,
+.navNext:hover {
+  color: var(--text-primary);
+  border-color: var(--primary);
+  background: rgba(99, 102, 241, 0.05);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.navNext {
+  margin-left: auto;
+}

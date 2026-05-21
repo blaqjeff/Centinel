@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { CentinelConfig, ChallengeDetails } from './types';
 import { getChallengeDetailsFromConfig, matchPath } from './matcher';
+import { assertConfigValid } from './validator';
 
 // Re-export matching utilities
 export { matchPath };
@@ -31,9 +32,14 @@ export function loadConfig(): CentinelConfig {
 
   try {
     const rawData = fs.readFileSync(configPath, 'utf-8');
-    cachedConfig = JSON.parse(rawData) as CentinelConfig;
+    const parsed = JSON.parse(rawData);
+    assertConfigValid(parsed);
+    cachedConfig = parsed;
     return cachedConfig;
   } catch (error: any) {
+    if (error.message.includes('Centinel Configuration Error')) {
+      throw error; // Re-throw our own validation errors
+    }
     throw new Error(`Centinel Configuration Error: Failed to parse config file: ${error.message}`);
   }
 }

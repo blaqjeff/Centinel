@@ -294,6 +294,16 @@ async function verifyBaseEdge(
 }
 
 /**
+ * CORS headers used for preflight and 402 responses.
+ */
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'X-Payment-Signature, X-Payment-Chain, X-Centinel-Proof, Authorization, Content-Type',
+  'Access-Control-Expose-Headers': 'WWW-Authenticate, X-402-Price, X-402-Solana-Address, X-402-Base-Address, X-402-Model, X-402-Duration, X-Centinel-Proof',
+};
+
+/**
  * Next.js Edge Middleware for Centinel x402.
  */
 export async function nextCentinel(req: NextRequest, config?: CentinelConfig) {
@@ -302,6 +312,15 @@ export async function nextCentinel(req: NextRequest, config?: CentinelConfig) {
       'Centinel Next.js Middleware requires the centinel.config.json object to be passed as the second argument: nextCentinel(request, config)'
     );
   }
+
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new NextResponse(null, {
+      status: 204,
+      headers: CORS_HEADERS,
+    });
+  }
+
   const requestedPath = req.nextUrl.pathname;
 
   // 1. Check if path is protected
@@ -437,9 +456,7 @@ export async function nextCentinel(req: NextRequest, config?: CentinelConfig) {
   responseHeaders.set('X-402-Model', challenge.model);
   if (challenge.duration) responseHeaders.set('X-402-Duration', challenge.duration);
   responseHeaders.set('Content-Type', 'application/json');
-  responseHeaders.set('Access-Control-Allow-Origin', '*');
-  responseHeaders.set('Access-Control-Allow-Headers', 'X-Payment-Signature, X-Payment-Chain, X-Centinel-Proof, Authorization, Content-Type');
-  responseHeaders.set('Access-Control-Expose-Headers', 'WWW-Authenticate, X-402-Price, X-402-Solana-Address, X-402-Base-Address, X-402-Model, X-402-Duration, X-Centinel-Proof');
+  Object.entries(CORS_HEADERS).forEach(([k, v]) => responseHeaders.set(k, v));
 
   return new NextResponse(JSON.stringify(responseBody), {
     status: 402,

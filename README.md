@@ -1,226 +1,269 @@
-# Centinel (x402-Connect) 🛡️
+# Centinel
 
-Centinel is a low-code TypeScript framework designed to monetize bot and scraper traffic. Instead of simple IP blocks or CAPTCHAs, Centinel intercepts agent traffic and requires micro-payments using the standard **HTTP 402 Payment Required** protocol.
+**Monetize your API for AI agents and bots using HTTP 402 Payment Required.**
 
-It handles declarative path rules, on-chain signature verification for **Solana** (USDC/SOL) and **Base** (USDC/ETH), and issues cryptographically signed **Time-Locked Proofs** (JWTs) for session-based paywalls.
+Centinel is a low-code middleware framework that lets developers charge AI agents (ChatGPT, Claude, custom bots) micropayments in crypto to access protected API routes. It implements the [x402 protocol](https://x402.org) — the emerging standard for machine-to-machine payments on the web.
 
----
+## How It Works
+
+```
+  AI Agent                         Your API (with Centinel)
+     │                                      │
+     ├─── GET /api/data ───────────────────►│
+     │                                      │
+     │◄── 402 Payment Required ─────────────┤  ← Centinel intercepts
+     │    (price: $0.01, wallets: {...})     │
+     │                                      │
+     ├─── Pays $0.01 USDC on Solana ───────►│  (blockchain tx)
+     │                                      │
+     ├─── GET /api/data ───────────────────►│
+     │    X-Payment-Signature: <tx_hash>    │
+     │    X-Payment-Chain: solana           │
+     │                                      │
+     │◄── 200 OK + data ───────────────────┤  ← Centinel verifies on-chain
+```
 
 ## Features
-- 🔌 **Plug-and-Play Middleware**: One-liner integration for Express.js and Edge-compatible Next.js.
-- ⚙️ **Declarative Policy Engine**: Simple path matching configurations (`centinel.config.json`).
-- ⛓️ **Multi-Chain Verification**: Solana Pay QR standard and Base EVM ERC20 validations directly against blockchain RPC nodes.
-- 🔑 **Time-Locked Proofs**: Stateless, cryptographically signed tokens allowing session-based bypass (e.g. pay $0.10 for 1-hour access).
-- 🚀 **Edge Runtime Optimized**: Pure Web Crypto APIs for Next.js middleware running on the edge.
 
----
+- 🔒 **x402 Protocol** — Standard HTTP 402 responses that AI agents understand
+- ⚡ **Multi-chain** — Accepts SOL, ETH, and USDC on Solana and Base
+- 🔧 **Zero-config** — `npx centinel init` scaffolds everything
+- 🛡️ **Replay protection** — Transaction age verification + in-memory deduplication
+- 🌐 **Framework support** — Next.js (Edge Runtime) and Express
+- 🔑 **Session tokens** — Pay once, access for a duration (JWT-based)
+- 📋 **Single source of truth** — All config in one `centinel.config.json` file
 
-## Installation
+## Quick Start
+
+### 1. Install
 
 ```bash
 npm install @ejemo/centinel
 ```
 
-Once installed, initialize the default configuration file and secure cryptographic session keys automatically by running:
+### 2. Initialize
 
 ```bash
 npx centinel init
 ```
 
-This will automatically:
-1. Create a `centinel.config.json` configuration template in your project root.
-2. Generate a secure, random cryptographic signing secret and append/create it as `JWT_SECRET` inside your `.env` file.
+This auto-detects your framework (Next.js or Express) and creates:
+- `centinel.config.json` — Your pricing rules and wallet addresses
+- `.env` with `JWT_SECRET` — For session token signing
+- `src/middleware.ts` — Framework-specific middleware (Next.js only)
+
+### 3. Configure
+
+Edit `centinel.config.json` with your wallet addresses and pricing:
+
+```json
+{
+  "wallets": {
+    "solana": "YOUR_SOLANA_WALLET_ADDRESS",
+    "base": "YOUR_BASE_WALLET_ADDRESS"
+  },
+  "rules": [
+    {
+      "path": "/api/scraped-data",
+      "price": "0.01",
+      "model": "per_request"
+    },
+    {
+      "path": "/premium-tools/*",
+      "price": "0.10",
+      "model": "per_session",
+      "duration": "1h"
+    }
+  ],
+  "maxTransactionAge": 300
+}
+```
+
+### 4. Done
+
+Start your dev server. Protected routes now return `402 Payment Required` to unauthenticated requests.
 
 ---
 
 ## Configuration
 
-The generated `centinel.config.json` file in the root of your project looks like this:
+### `centinel.config.json`
+
+| Field | Type | Description |
+|---|---|---|
+| `wallets.solana` | `string` | Your Solana wallet address for receiving payments |
+| `wallets.base` | `string` | Your Base (Ethereum L2) wallet address |
+| `rules` | `array` | Array of protection rules |
+| `rules[].path` | `string` | URL path to protect. Supports wildcards: `/api/*` |
+| `rules[].price` | `string` | Price in USD (as a string). e.g., `"0.01"` |
+| `rules[].model` | `string` | `"per_request"` or `"per_session"` |
+| `rules[].duration` | `string` | Session duration (per_session only). e.g., `"1h"`, `"30m"`, `"7d"` |
+| `maxTransactionAge` | `number` | Max age of a valid transaction in seconds. Default: `300` (5 min) |
+
+### Billing Models
+
+- **`per_request`** — Every request requires a fresh payment. Best for high-value data endpoints.
+- **`per_session`** — Pay once, get a JWT session token valid for `duration`. Best for tools/dashboards.
+
+### Path Wildcards
 
 ```json
-{
-  "wallets": {
-    "solana": "7EcDhSwZ1mG58z9L7P9D6HtgpLhS9Kq7z4yP18WpD6aB",
-    "base": "0x71C7656EC7ab88b098defB751B7401B5f6d8976F"
-  },
-  "rules": [
-    {
-      "path": "/api/free",
-      "price": "0.00",
-      "model": "per_request"
-    },
-    {
-      "path": "/api/data",
-      "price": "0.01",
-      "model": "per_request"
-    },
-    {
-      "path": "/premium/*",
-      "price": "0.10",
-      "model": "per_session",
-      "duration": "1h"
-    }
-  ]
-}
+{ "path": "/api/data" }         // Exact match only
+{ "path": "/api/*" }            // Matches /api/anything and /api/deep/nested/paths
+{ "path": "/premium-tools/*" }  // Matches all paths under /premium-tools/
 ```
-
-### Options
-* `wallets`: Target developer wallets for payment routes.
-* `rules`: Matching routes using glob patterns.
-* `price`: Pricing in USDC/USD value.
-* `model`: 
-  * `per_request`: Requires a new transaction verification for every request.
-  * `per_session`: Issues a Time-Locked Proof token allowing free access for `duration`.
-* `duration`: Valid time duration (e.g., `15m`, `1h`, `24h`) for session-based routes.
 
 ---
 
-## Integration
+## Framework Integration
 
-### 1. Express.js Setup
+### Next.js (App Router)
+
+After running `npx centinel init`, your auto-generated `src/middleware.ts` looks like:
+
+```typescript
+import { nextCentinel } from '@ejemo/centinel/next';
+import type { NextRequest } from 'next/server';
+import centinelConfig from '../centinel.config.json';
+
+export async function middleware(request: NextRequest) {
+  return await nextCentinel(request, centinelConfig);
+}
+
+export const config = {
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
+  ],
+};
+```
+
+> **Note:** Uses the `@ejemo/centinel/next` subpath export, which is Edge Runtime compatible (no Node.js dependencies).
+
+### Express
+
 ```typescript
 import express from 'express';
-import cookieParser from 'cookie-parser';
 import { centinelExpress } from '@ejemo/centinel';
 
 const app = express();
 
-app.use(cookieParser());
-app.use(express.json());
-
-// Load Centinel Middleware
+// Apply Centinel to all routes — it reads centinel.config.json automatically
 app.use(centinelExpress());
 
-// Unrestricted route
-app.get('/api/free', (req, res) => {
-  res.json({ message: "Free route" });
-});
-
-// Protected route (requires $0.01 payment)
 app.get('/api/data', (req, res) => {
-  res.json({ secretData: "This data was paid for." });
+  res.json({ data: 'Protected content' });
 });
 
 app.listen(3000);
 ```
 
-### 2. Next.js Middleware Setup (`middleware.ts`)
-For Edge and Next.js applications, use the Edge-optimized lightweight interceptor:
+---
 
-```typescript
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { nextCentinel } from '@ejemo/centinel';
+## Security
 
-export async function middleware(request: NextRequest) {
-  return await nextCentinel(request);
-}
+### Mock Signatures (Development Only)
 
-// Select routes to apply middleware
-export const config = {
-  matcher: ['/api/data', '/premium/:path*'],
-};
+During development, you can bypass payment verification with mock signatures:
+
+```bash
+curl -H "X-Payment-Signature: mock_test123" \
+     -H "X-Payment-Chain: solana" \
+     http://localhost:3000/api/data
 ```
+
+**Mock signatures are automatically blocked in production** (`NODE_ENV=production`).
+
+To explicitly allow mocks in production (testing/staging), set:
+```
+CENTINEL_ALLOW_MOCK=true
+```
+
+### Replay Attack Protection
+
+Centinel uses a two-layer defense against transaction replay attacks:
+
+1. **Transaction age verification** — Reads the block timestamp from the blockchain. Transactions older than `maxTransactionAge` seconds (default: 5 minutes) are rejected.
+
+2. **In-memory deduplication** — After successful verification, the transaction hash is cached. Duplicate submissions within the same server instance are instantly rejected.
+
+### Config Validation
+
+Centinel validates `centinel.config.json` on startup. If the config is invalid (missing wallets, wrong price format, etc.), it throws a clear, formatted error message explaining exactly what to fix.
 
 ---
 
 ## Environment Variables
 
-Configure your blockchain endpoints and secrets in `.env`:
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `JWT_SECRET` | Recommended | `centinel-default-dev-secret-key-...` | Secret key for signing session JWTs |
+| `SOLANA_RPC_URL` | No | `https://api.devnet.solana.com` | Solana RPC endpoint |
+| `BASE_RPC_URL` | No | `https://sepolia.base.org` | Base RPC endpoint |
+| `NODE_ENV` | No | — | Set to `production` to block mock signatures |
+| `CENTINEL_ALLOW_MOCK` | No | — | Set to `true` to allow mock signatures in production |
 
-```env
-# Node endpoints (Defaults are set to Devnet / Sepolia)
-SOLANA_RPC_URL=https://api.devnet.solana.com
-BASE_RPC_URL=https://sepolia.base.org
-
-# JWT Token Secret for Session signing
-JWT_SECRET=your-secure-shared-secret-key
-```
+> **Production:** Update `SOLANA_RPC_URL` to a mainnet endpoint (e.g., Helius, QuickNode) and `BASE_RPC_URL` to `https://mainnet.base.org`.
 
 ---
 
-## Client Integration: x402 Handshake
+## API Reference
 
-When an AI agent or scraper makes a request, they should handle the payment handshake:
+### 402 Response Format
 
-### 1. Initial Request
-```http
-GET /api/data HTTP/1.1
-Host: example.com
-```
+When a request hits a protected route without payment:
 
-### 2. Challenge Response (402 Payment Required)
-Centinel returns a `402` status code with the challenge inside the `WWW-Authenticate` header:
-
-```http
-HTTP/1.1 402 Payment Required
-WWW-Authenticate: x402 chain="solana", address="7Ec...", price="0.01", token="USDC"; chain="base", address="0x71...", price="0.01", token="USDC"
-Content-Type: application/json
-
+```json
 {
+  "error": "Payment Required",
+  "message": "Payment required to access this resource. Cost is $0.01 USDC.",
   "payment": {
     "price": "0.01",
     "currencies": ["USDC", "SOL", "ETH"],
     "wallets": {
-      "solana": "7EcDhSwZ1mG58z9L7P9D6HtgpLhS9Kq7z4yP18WpD6aB",
-      "base": "0x71C7656EC7ab88b098defB751B7401B5f6d8976F"
+      "solana": "7EcDhSw...",
+      "base": "0x71C765..."
     },
     "model": "per_request"
   }
 }
 ```
 
-### 3. Payment Submission
-The agent completes a transaction transferring the price amount to the target wallet. It then retries the request including the signature:
-
-```http
-GET /api/data HTTP/1.1
-Host: example.com
-X-Payment-Signature: 5hHwQhXh2h...
-X-Payment-Chain: solana
+**Response Headers:**
+```
+HTTP/1.1 402 Payment Required
+WWW-Authenticate: x402 chain="solana", address="...", price="0.01", token="USDC"
+X-402-Price: 0.01
+X-402-Solana-Address: 7EcDhSw...
+X-402-Base-Address: 0x71C765...
+X-402-Model: per_request
 ```
 
-### 4. Successful Verification (200 OK)
-Centinel verifies the transaction directly against the ledger.
-* For `per_request`: It returns the resource payload immediately.
-* For `per_session`: It returns the resource payload along with a `X-Centinel-Proof` JWT token.
+### Payment Request Headers
 
-```http
-HTTP/1.1 200 OK
-X-Centinel-Proof: eyJhbGciOiJIUzI1NiIsInR...
-Content-Type: application/json
+AI agents submit payment proof via headers:
 
-{
-  "secretData": "This data was paid for."
-}
+```
+X-Payment-Signature: <transaction_hash>
+X-Payment-Chain: solana | base
 ```
 
-Subsequent session requests can bypass the gate by supplying the proof in the `Authorization` header:
+### Session Token (per_session model)
 
-```http
-GET /premium/analytics HTTP/1.1
-Host: example.com
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR...
-```
+After successful payment, the session token is returned as:
+- **Cookie:** `x-centinel-proof` (HTTPOnly)
+- **Header:** `X-Centinel-Proof`
+- **Bearer token:** `Authorization: Bearer <token>`
 
 ---
 
-## Local Development & Testing
+## Testing
 
-To test payments locally without spending real tokens:
-1. Centinel's verification engine recognizes signatures prefixed with `mock_` (e.g. `mock_1234567`).
-2. Submitting a `mock_` signature immediately bypasses the chain check and issues a valid session token, enabling rapid frontend and integration tests.
-
-To link the package locally in other projects:
 ```bash
-# In C:\centinel
-npm link
-
-# In your test web app directory
-npm link @ejemo/centinel
+npm test
 ```
 
 ---
 
 ## License
-MIT
+
+MIT © [Ejemo Tech](https://ejemotech.com)

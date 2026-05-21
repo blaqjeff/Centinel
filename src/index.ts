@@ -2,6 +2,7 @@
 export { getChallengeDetails, loadConfig, matchPath } from './core/policy';
 export { verifyPayment } from './core/verifier';
 export { generateSessionToken, verifySessionToken } from './core/token';
+export { validateConfig, assertConfigValid } from './core/validator';
 
 // Middleware exports
 export { centinelExpress } from './middleware/express';

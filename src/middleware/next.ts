@@ -357,7 +357,7 @@ export async function nextCentinel(req: NextRequest, config?: CentinelConfig) {
 
   if (paymentSignature && (paymentChain === 'solana' || paymentChain === 'base')) {
     // IP Extraction for Rate Limiting
-    const ip = req.headers.get('x-forwarded-for') || req.ip || 'unknown';
+    const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
     if (globalRateLimiter.isBlocked(ip)) {
       return new NextResponse(
         JSON.stringify({

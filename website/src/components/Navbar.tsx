@@ -10,9 +10,9 @@ interface NavbarProps {
 
 export default function Navbar({ starCount: initialStarCount }: NavbarProps) {
   const [stars, setStars] = useState<number | null>(initialStarCount);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
-    // Dynamically fetch from local route to get fresh stars count
     async function fetchStars() {
       try {
         const res = await fetch("/api/github-stars");
@@ -27,6 +27,15 @@ export default function Navbar({ starCount: initialStarCount }: NavbarProps) {
       }
     }
     fetchStars();
+  }, []);
+
+  // Close mobile menu on route change or resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth > 768) setMenuOpen(false);
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   return (
@@ -47,6 +56,7 @@ export default function Navbar({ starCount: initialStarCount }: NavbarProps) {
         <span>Centinel</span>
       </Link>
 
+      {/* Desktop nav links */}
       <nav className={styles.navLinks}>
         <Link href="/#features" className={styles.link}>
           Features
@@ -59,6 +69,7 @@ export default function Navbar({ starCount: initialStarCount }: NavbarProps) {
         </Link>
       </nav>
 
+      {/* Desktop actions */}
       <div className={styles.actions}>
         <a
           href="https://github.com/blaqjeff/Centinel"
@@ -96,6 +107,62 @@ export default function Navbar({ starCount: initialStarCount }: NavbarProps) {
           </svg>
         </a>
       </div>
+
+      {/* Mobile hamburger button */}
+      <button
+        className={styles.hamburger}
+        onClick={() => setMenuOpen(!menuOpen)}
+        aria-label="Toggle menu"
+      >
+        <span className={`${styles.hamburgerLine} ${menuOpen ? styles.hamburgerOpen1 : ""}`} />
+        <span className={`${styles.hamburgerLine} ${menuOpen ? styles.hamburgerOpen2 : ""}`} />
+        <span className={`${styles.hamburgerLine} ${menuOpen ? styles.hamburgerOpen3 : ""}`} />
+      </button>
+
+      {/* Mobile slide-down menu */}
+      {menuOpen && (
+        <div className={styles.mobileMenu}>
+          <Link href="/#features" className={styles.mobileLink} onClick={() => setMenuOpen(false)}>
+            Features
+          </Link>
+          <Link href="/#use-cases" className={styles.mobileLink} onClick={() => setMenuOpen(false)}>
+            Use Cases
+          </Link>
+          <Link href="/docs" className={styles.mobileLink} onClick={() => setMenuOpen(false)}>
+            Documentation
+          </Link>
+          <div className={styles.mobileActions}>
+            <a
+              href="https://github.com/blaqjeff/Centinel"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.githubBadge}
+            >
+              <svg height="16" viewBox="0 0 16 16" width="16" fill="currentColor">
+                <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
+              </svg>
+              <span>GitHub</span>
+              <span className={styles.starsCount}>
+                <svg viewBox="0 0 24 24" width="12" height="12">
+                  <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+                </svg>
+                {stars !== null ? stars : "—"}
+              </span>
+            </a>
+            <a
+              href="https://www.npmjs.com/package/@ejemo/centinel"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.npmLink}
+            >
+              NPM
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
+            </a>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

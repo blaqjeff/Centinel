@@ -25,6 +25,7 @@
   letter-spacing: -0.03em;
   color: var(--text-primary);
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .logoSvg {
@@ -40,7 +41,7 @@
 
 @media (max-width: 768px) {
   .navLinks {
-    display: none; /* Hide on mobile for simplicity, or we can build a toggle */
+    display: none;
   }
 }
 
@@ -48,7 +49,7 @@
   font-size: 0.9rem;
   font-weight: 500;
   color: var(--text-secondary);
-  transition: color 0.2s, transform 0.2s;
+  transition: color 0.2s;
   cursor: pointer;
 }
 
@@ -60,6 +61,12 @@
   display: flex;
   align-items: center;
   gap: 16px;
+}
+
+@media (max-width: 768px) {
+  .actions {
+    display: none;
+  }
 }
 
 .githubBadge {
@@ -75,6 +82,7 @@
   color: var(--text-secondary);
   transition: all 0.2s ease;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .githubBadge:hover {
@@ -108,10 +116,112 @@
   border-radius: 20px;
   color: white;
   transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
 .npmLink:hover {
   transform: translateY(-1px);
   background: var(--primary-hover);
   box-shadow: 0 4px 16px rgba(99, 102, 241, 0.25);
+}
+
+/* ═══════ Hamburger Button ═══════ */
+
+.hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 32px;
+  height: 32px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  z-index: 110;
+}
+
+@media (max-width: 768px) {
+  .hamburger {
+    display: flex;
+  }
+}
+
+.hamburgerLine {
+  display: block;
+  width: 20px;
+  height: 2px;
+  background: var(--text-secondary);
+  border-radius: 2px;
+  transition: all 0.3s ease;
+  transform-origin: center;
+}
+
+.hamburgerOpen1 {
+  transform: translateY(7px) rotate(45deg);
+}
+
+.hamburgerOpen2 {
+  opacity: 0;
+}
+
+.hamburgerOpen3 {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+/* ═══════ Mobile Menu ═══════ */
+
+.mobileMenu {
+  display: none;
+  position: absolute;
+  top: 64px;
+  left: 0;
+  right: 0;
+  background: rgba(5, 5, 5, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border-color);
+  padding: 20px 24px;
+  flex-direction: column;
+  gap: 4px;
+  animation: slideDown 0.25s ease-out;
+}
+
+@media (max-width: 768px) {
+  .mobileMenu {
+    display: flex;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.mobileLink {
+  display: block;
+  padding: 12px 0;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-color);
+  transition: color 0.2s;
+}
+
+.mobileLink:hover {
+  color: var(--text-primary);
+}
+
+.mobileActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
 }

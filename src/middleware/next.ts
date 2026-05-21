@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { CentinelConfig } from '../core/types';
 import { getChallengeDetailsFromConfig, matchPath } from '../core/matcher';
+import { globalRateLimiter } from '../core/rate-limiter';
 
 /**
  * Edge-compatible JWT verification using the native Web Crypto API.
@@ -355,6 +356,18 @@ export async function nextCentinel(req: NextRequest, config?: CentinelConfig) {
   const paymentChain = req.headers.get('x-payment-chain')?.toLowerCase();
 
   if (paymentSignature && (paymentChain === 'solana' || paymentChain === 'base')) {
+    // IP Extraction for Rate Limiting
+    const ip = req.headers.get('x-forwarded-for') || req.ip || 'unknown';
+    if (globalRateLimiter.isBlocked(ip)) {
+      return new NextResponse(
+        JSON.stringify({
+          error: 'Too Many Requests',
+          message: 'Too many failed payment verification attempts. Please try again later.'
+        }),
+        { status: 429, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Mock signatures — only allowed in non-production environments
     if (paymentSignature.startsWith('mock_')) {
       const allowMock = process.env.NODE_ENV !== 'production' || process.env.CENTINEL_ALLOW_MOCK === 'true';
@@ -388,6 +401,7 @@ export async function nextCentinel(req: NextRequest, config?: CentinelConfig) {
         : await verifyBaseEdge(paymentSignature, challenge.price, wallet, rpcUrl, maxAge);
 
       if (verified) {
+        globalRateLimiter.recordSuccess(ip);
         console.log(`[Centinel Edge] Signature verified: ${paymentSignature}`);
         const res = NextResponse.next();
         
@@ -402,6 +416,8 @@ export async function nextCentinel(req: NextRequest, config?: CentinelConfig) {
         }
         
         return res;
+      } else {
+        globalRateLimiter.recordFailure(ip);
       }
     }
   }

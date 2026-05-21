@@ -22,7 +22,8 @@
     "test": "jest",
     "start": "ts-node src/index.ts",
     "demo:server": "ts-node demo/server.ts",
-    "demo:agent": "ts-node demo/agent.ts"
+    "demo:agent": "ts-node demo/agent.ts",
+    "release": "npm run build && npm test && npm publish"
   },
   "keywords": [
     "x402",

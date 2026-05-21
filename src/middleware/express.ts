@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { getChallengeDetails, matchPath, loadConfig } from '../core/policy';
 import { verifyPayment } from '../core/verifier';
 import { generateSessionToken, verifySessionToken } from '../core/token';
+import { globalRateLimiter } from '../core/rate-limiter';
 
 /**
  * Fallback cookie parser to read session token if cookie-parser middleware is not used.
@@ -71,12 +72,22 @@ export function centinelExpress() {
         return send402Challenge(res, challenge);
       }
 
+      // IP Extraction for Rate Limiting
+      const ip = (req.headers['x-forwarded-for'] as string) || req.ip || 'unknown';
+      if (globalRateLimiter.isBlocked(ip)) {
+        return res.status(429).json({
+          error: 'Too Many Requests',
+          message: 'Too many failed payment verification attempts. Please try again later.'
+        });
+      }
+
       console.log(`[Centinel] Verifying payment signature: ${paymentSignature} on ${paymentChain}...`);
       const config = loadConfig();
       const maxAge = config.maxTransactionAge ?? 300;
       const verification = await verifyPayment(paymentSignature, paymentChain, challenge.price, wallet, maxAge);
       
       if (verification.success) {
+        globalRateLimiter.recordSuccess(ip);
         console.log(`[Centinel] Verification successful! Unlocking path: ${requestedPath}`);
         
         if (challenge.model === 'per_session') {
@@ -95,6 +106,7 @@ export function centinelExpress() {
         
         return next(); // Payment validated, proceed
       } else {
+        globalRateLimiter.recordFailure(ip);
         console.warn(`[Centinel] Verification failed for signature: ${paymentSignature}. Error: ${verification.error}`);
         res.setHeader('X-Centinel-Error', verification.error || 'Invalid signature');
       }

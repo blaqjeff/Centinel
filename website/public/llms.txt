@@ -138,3 +138,70 @@ For testing and offline integration, Centinel includes a CLI agent to simulate a
 npm run demo:agent
 ```
 This script handles parsing the `402` headers, initiating a transaction, submitting the transaction hash, and retrieving the payload.
+
+---
+
+## 7. Webhooks & Callbacks
+
+Centinel supports programmatic callbacks and HTTP webhooks to notify your system when payments are successfully verified.
+
+### Programmatic Callbacks
+Register callback handlers directly in your middleware options:
+
+#### Express:
+```typescript
+app.use(centinelExpress({
+  onPaymentVerified: (payment) => {
+    console.log(`Payment verified for ${payment.path}. Signature: ${payment.signature}`);
+  }
+}));
+```
+
+#### Next.js:
+```typescript
+export async function middleware(request: NextRequest) {
+  return await nextCentinel(request, centinelConfig, {
+    onPaymentVerified: (payment) => {
+      console.log(`Verified ${payment.chain} payment of $${payment.price}`);
+    }
+  });
+}
+```
+
+### HTTP Webhooks
+Specify a `webhookUrl` in `centinel.config.json` or pass it in the middleware options:
+```json
+{
+  "webhookUrl": "https://api.yourdomain.com/webhooks/centinel"
+}
+```
+
+#### Payload format:
+```json
+{
+  "event": "payment.verified",
+  "timestamp": 1716388421,
+  "payment": {
+    "signature": "3u7sDf8...",
+    "chain": "solana",
+    "price": "0.01",
+    "path": "/api/scraped-data"
+  }
+}
+```
+
+#### Signature Verification:
+Webhooks are signed using HMAC-SHA256 and sent with the `X-Centinel-Signature` header (signed using `CENTINEL_WEBHOOK_SECRET` or `JWT_SECRET`).
+```typescript
+import crypto from 'crypto';
+
+const computed = crypto
+  .createHmac('sha256', process.env.JWT_SECRET)
+  .update(rawBody)
+  .digest('hex');
+
+if (computed === req.headers['x-centinel-signature']) {
+  // Webhook is authentic
+}
+```
+

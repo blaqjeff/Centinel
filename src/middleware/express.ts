@@ -3,6 +3,8 @@ import { getChallengeDetails, matchPath, loadConfig } from '../core/policy';
 import { verifyPayment } from '../core/verifier';
 import { generateSessionToken, verifySessionToken } from '../core/token';
 import { globalRateLimiter } from '../core/rate-limiter';
+import { CentinelExpressOptions } from '../core/types';
+import { dispatchWebhook } from '../core/webhook';
 
 /**
  * Fallback cookie parser to read session token if cookie-parser middleware is not used.
@@ -29,7 +31,7 @@ function getCookie(req: Request, name: string): string | null {
 /**
  * Express Middleware for Centinel x402 Protection.
  */
-export function centinelExpress() {
+export function centinelExpress(options?: CentinelExpressOptions) {
   return async (req: Request, res: Response, next: NextFunction) => {
     const requestedPath = req.path;
     
@@ -90,6 +92,43 @@ export function centinelExpress() {
         globalRateLimiter.recordSuccess(ip);
         console.log(`[Centinel] Verification successful! Unlocking path: ${requestedPath}`);
         
+        // 1. Programmatic Callback (Non-blocking)
+        if (options?.onPaymentVerified) {
+          try {
+            const callbackPromise = options.onPaymentVerified({
+              signature: paymentSignature,
+              chain: paymentChain as 'solana' | 'base',
+              price: challenge.price,
+              path: requestedPath,
+              req,
+            });
+            if (callbackPromise instanceof Promise) {
+              callbackPromise.catch((err) => {
+                console.error('[Centinel] Error in onPaymentVerified callback:', err);
+              });
+            }
+          } catch (err) {
+            console.error('[Centinel] Error in onPaymentVerified callback:', err);
+          }
+        }
+
+        // 2. Webhook delivery (Non-blocking)
+        const webhookUrl = options?.webhookUrl || config.webhookUrl;
+        if (webhookUrl) {
+          const webhookSecret = process.env.CENTINEL_WEBHOOK_SECRET || process.env.JWT_SECRET || 'centinel-default-webhook-secret';
+          const webhookPayload = {
+            event: 'payment.verified' as const,
+            timestamp: Math.floor(Date.now() / 1000),
+            payment: {
+              signature: paymentSignature,
+              chain: paymentChain as 'solana' | 'base',
+              price: challenge.price,
+              path: requestedPath,
+            },
+          };
+          dispatchWebhook(webhookUrl, webhookPayload, webhookSecret);
+        }
+
         if (challenge.model === 'per_session') {
           const duration = challenge.duration || '1h';
           const sessionToken = generateSessionToken(requestedPath, paymentSignature, paymentChain, duration);

@@ -207,6 +207,103 @@ Centinel validates `centinel.config.json` on startup. If the config is invalid (
 
 ---
 
+## Webhooks & Callbacks
+
+Centinel allows you to execute programmatic callback functions or send HTTP webhooks when an AI agent's transaction is successfully verified. This is useful for logging payments in your own database, updating usage quotas, or triggering email/Slack notifications.
+
+### 1. Programmatic Callbacks
+You can register an `onPaymentVerified` callback function directly in the middleware configuration options. The callback receives details about the verified transaction:
+
+#### Express.js Setup
+```typescript
+import { centinelExpress } from '@ejemo/centinel';
+
+app.use(
+  centinelExpress({
+    onPaymentVerified: async (payment) => {
+      console.log(`Payment received! Path: ${payment.path}, Chain: ${payment.chain}, Sig: ${payment.signature}`);
+      // TODO: Save to your database (e.g. Prisma: db.transaction.create(...))
+    },
+  })
+);
+```
+
+#### Next.js Setup
+```typescript
+import { nextCentinel } from '@ejemo/centinel/next';
+import type { NextRequest } from 'next/server';
+import centinelConfig from '../centinel.config.json';
+
+export async function middleware(request: NextRequest) {
+  return await nextCentinel(request, centinelConfig, {
+    onPaymentVerified: async (payment) => {
+      console.log(`Verified mock or real payment of $${payment.price} on ${payment.chain}`);
+    },
+  });
+}
+```
+
+### 2. Webhooks (HTTP POST)
+You can configure Centinel to automatically dispatch a signed HTTP POST request to a webhook URL on successful payments.
+
+#### Configuration
+Set the `webhookUrl` parameter in your `centinel.config.json`:
+```json
+{
+  "wallets": { ... },
+  "rules": [ ... ],
+  "webhookUrl": "https://api.yourdomain.com/webhooks/centinel"
+}
+```
+Or pass it directly in the middleware options:
+```typescript
+app.use(centinelExpress({ webhookUrl: 'https://api.yourdomain.com/webhooks/centinel' }));
+```
+
+#### Webhook Payload Format
+The webhook is sent as a `POST` request with a JSON body:
+```json
+{
+  "event": "payment.verified",
+  "timestamp": 1716388421,
+  "payment": {
+    "signature": "3u7sDf8...",
+    "chain": "solana",
+    "price": "0.01",
+    "path": "/api/scraped-data"
+  }
+}
+```
+
+#### Webhook Verification (Security)
+To ensure the webhook actually came from your Centinel server, Centinel signs the JSON payload using **HMAC-SHA256** and includes the hex signature in the `X-Centinel-Signature` header.
+- The secret used is `process.env.CENTINEL_WEBHOOK_SECRET` (falling back to `process.env.JWT_SECRET`).
+- On your webhook server, verify it by computing the HMAC of the raw request body with your secret key:
+
+```typescript
+import crypto from 'crypto';
+
+app.post('/webhooks/centinel', express.raw({ type: 'application/json' }), (req, res) => {
+  const signature = req.headers['x-centinel-signature'];
+  const secret = process.env.CENTINEL_WEBHOOK_SECRET || process.env.JWT_SECRET;
+  
+  const computedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(req.body)
+    .digest('hex');
+
+  if (signature !== computedSignature) {
+    return res.status(401).send('Unauthorized signature');
+  }
+
+  // Signature is valid, process webhook event
+  const { payment } = JSON.parse(req.body.toString());
+  res.status(200).send('OK');
+});
+```
+
+---
+
 ## API Reference
 
 ### 402 Response Format

@@ -18,6 +18,7 @@ const sidebarItems: SidebarItem[] = [
   { id: "security", label: "Security & Verification" },
   { id: "environment", label: "Environment Variables" },
   { id: "mocking", label: "Local Mocking" },
+  { id: "webhooks", label: "Webhooks & Callbacks" },
 ];
 
 /* ─── Token Types for Syntax Highlighting ────────────────────────────────── */
@@ -1026,6 +1027,143 @@ console.log(data); // Your actual API response`}
             filename="test-agent.ts"
           />
         </section>
+
+        {/* ══════════════════ WEBHOOKS & CALLBACKS ══════════════════ */}
+        <section className={`${styles.section} ${activeSection === "webhooks" ? styles.sectionActive : ""}`}>
+          <h1 className={styles.docTitle}>Webhooks &amp; Callbacks</h1>
+          <p className={styles.docSubtitle}>
+            Trigger notifications, synchronize API quotas, and record transactions in your database when payments are verified.
+          </p>
+
+          <h2>1. Programmatic Callbacks</h2>
+          <p>
+            You can register an <span className={styles.inlineCode}>onPaymentVerified</span> callback directly in the middleware options. Centinel runs this function asynchronously upon verification success, ensuring it does not block the client's API response.
+          </p>
+
+          <h3>Express Setup</h3>
+          <CodeBlock
+            id="express-callback"
+            code={`import express from 'express';
+import { centinelExpress } from '@ejemo/centinel';
+
+const app = express();
+
+app.use(centinelExpress({
+  onPaymentVerified: async (payment) => {
+    console.log(\`Received \$\${payment.price} payment on \${payment.chain}!\`);
+    console.log(\`Signature: \${payment.signature} | Path: \${payment.path}\`);
+    // TODO: Write to your database (e.g. Prisma: db.transaction.create(...))
+  }
+}));`}
+            filename="server.ts"
+          />
+
+          <h3>Next.js Setup</h3>
+          <CodeBlock
+            id="next-callback"
+            code={`import { nextCentinel } from '@ejemo/centinel/next';
+import type { NextRequest } from 'next/server';
+import centinelConfig from '../centinel.config.json';
+
+export async function middleware(request: NextRequest) {
+  return await nextCentinel(request, centinelConfig, {
+    onPaymentVerified: async (payment) => {
+      console.log(\`Verified \${payment.chain} transaction for \${payment.path}\`);
+    }
+  });
+}`}
+            filename="src/middleware.ts"
+          />
+
+          <h2>2. Webhooks (HTTP POST)</h2>
+          <p>
+            Configure Centinel to automatically send a signed JSON POST request to your webhooks receiver when payment verifications succeed.
+          </p>
+
+          <h3>Configuration</h3>
+          <p>
+            Add a <span className={styles.inlineCode}>"webhookUrl"</span> field to your <span className={styles.inlineCode}>centinel.config.json</span>:
+          </p>
+          <CodeBlock
+            id="webhook-config"
+            code={`{
+  "wallets": {
+    "solana": "7EcDhSwZ1mG58z9L7P9D6HtgpLhS9Kq7z4yP18WpD6aB"
+  },
+  "rules": [
+    { "path": "/api/scraped-data", "price": "0.01", "model": "per_request" }
+  ],
+  "webhookUrl": "https://api.yourdomain.com/webhooks/centinel"
+}`}
+            filename="centinel.config.json"
+            lang="json"
+          />
+          <p>
+            Or pass it programmatically in the middleware configuration options:
+          </p>
+          <CodeBlock
+            id="webhook-options"
+            code={`app.use(centinelExpress({
+  webhookUrl: 'https://api.yourdomain.com/webhooks/centinel'
+}));`}
+            filename="server.ts"
+          />
+
+          <h3>Webhook Payload format</h3>
+          <CodeBlock
+            id="webhook-payload"
+            code={`{
+  "event": "payment.verified",
+  "timestamp": 1716388421,
+  "payment": {
+    "signature": "3u7sDf8...",
+    "chain": "solana",
+    "price": "0.01",
+    "path": "/api/scraped-data"
+  }
+}`}
+            filename="Webhook Payload"
+            lang="json"
+          />
+
+          <h3>Webhook Verification (Security)</h3>
+          <p>
+            To verify that a webhook POST actually originated from your Centinel server, check the signature included in the <span className={styles.inlineCode}>X-Centinel-Signature</span> header.
+          </p>
+          <p>
+            Centinel computes a **HMAC-SHA256** hash of the raw request body using your secret key. The signing secret is read from <span className={styles.inlineCode}>process.env.CENTINEL_WEBHOOK_SECRET</span> (falling back to your <span className={styles.inlineCode}>JWT_SECRET</span>).
+          </p>
+          <CodeBlock
+            id="webhook-verification"
+            code={`import express from 'express';
+import crypto from 'crypto';
+
+const app = express();
+
+// Use raw body parser to get the exact unparsed JSON string
+app.post('/webhooks/centinel', express.raw({ type: 'application/json' }), (req, res) => {
+  const signature = req.headers['x-centinel-signature'];
+  const secret = process.env.CENTINEL_WEBHOOK_SECRET || process.env.JWT_SECRET;
+  
+  const computedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(req.body)
+    .digest('hex');
+
+  if (signature !== computedSignature) {
+    return res.status(401).send('Invalid signature');
+  }
+
+  // Signature matches! Safe to parse body and record payment
+  const payload = JSON.parse(req.body.toString());
+  console.log('Valid payment webhook received:', payload.payment.signature);
+  
+  res.sendStatus(200);
+});`}
+            filename="webhook-receiver.ts"
+          />
+        </section>
+
         {/* ══════════════════ PREV / NEXT NAVIGATION ══════════════════ */}
         <div className={styles.sectionNav}>
           {sidebarItems.findIndex((s) => s.id === activeSection) > 0 && (

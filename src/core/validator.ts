@@ -75,6 +75,13 @@ export function validateConfig(config: unknown): string[] {
     }
   }
 
+  // Validate webhookUrl
+  if (cfg.webhookUrl !== undefined) {
+    if (typeof cfg.webhookUrl !== 'string' || !/^https?:\/\/\S+$/.test(cfg.webhookUrl)) {
+      errors.push('"webhookUrl" must be a valid HTTP or HTTPS URL.');
+    }
+  }
+
   return errors;
 }
 

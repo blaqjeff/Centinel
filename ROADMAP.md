@@ -9,7 +9,7 @@ This document tracks planned features, improvements, and known edge cases that w
 
 ## Medium Priority
 
-- [ ] **Payment webhook/callbacks:** Provide a way for developers to receive webhooks or register callbacks when a payment is successfully verified. This is useful for recording transactions in a custom database.
+- [x] **Payment webhook/callbacks:** Provide a way for developers to receive webhooks or register callbacks when a payment is successfully verified. This is useful for recording transactions in a custom database.
 - [ ] **Dashboard/Analytics:** Build a UI or provide tooling to view revenue metrics, track the most-accessed protected paths, and analyze bot traffic.
 
 ## Maintenance / Other

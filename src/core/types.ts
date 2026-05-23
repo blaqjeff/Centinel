@@ -11,6 +11,11 @@ export interface CentinelConfig {
    * Default: 300 (5 minutes).
    */
   maxTransactionAge?: number;
+  /**
+   * Optional HTTP/HTTPS URL to send a POST request to when a payment
+   * is successfully verified.
+   */
+  webhookUrl?: string;
 }
 
 export interface CentinelRule {
@@ -52,3 +57,37 @@ export interface SignatureStore {
   /** Mark a signature as used. ttlSeconds is optional auto-expiry. */
   add(signature: string, ttlSeconds?: number): Promise<void>;
 }
+
+export interface WebhookPayload {
+  event: 'payment.verified';
+  timestamp: number;
+  payment: {
+    signature: string;
+    chain: 'solana' | 'base';
+    price: string;
+    path: string;
+  };
+}
+
+export interface CentinelExpressOptions {
+  onPaymentVerified?: (payment: {
+    signature: string;
+    chain: 'solana' | 'base';
+    price: string;
+    path: string;
+    req: any; // Express Request
+  }) => void | Promise<void>;
+  webhookUrl?: string;
+}
+
+export interface CentinelNextOptions {
+  onPaymentVerified?: (payment: {
+    signature: string;
+    chain: 'solana' | 'base';
+    price: string;
+    path: string;
+    req: any; // NextRequest
+  }) => void | Promise<void>;
+  webhookUrl?: string;
+}
+

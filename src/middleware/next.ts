@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { CentinelConfig } from '../core/types';
+import { CentinelConfig, CentinelNextOptions } from '../core/types';
 import { getChallengeDetailsFromConfig, matchPath } from '../core/matcher';
 import { globalRateLimiter } from '../core/rate-limiter';
+import { dispatchWebhook } from '../core/webhook';
 
 /**
  * Edge-compatible JWT verification using the native Web Crypto API.
@@ -307,7 +308,7 @@ const CORS_HEADERS = {
 /**
  * Next.js Edge Middleware for Centinel x402.
  */
-export async function nextCentinel(req: NextRequest, config?: CentinelConfig) {
+export async function nextCentinel(req: NextRequest, config?: CentinelConfig, options?: CentinelNextOptions) {
   if (!config) {
     throw new Error(
       'Centinel Next.js Middleware requires the centinel.config.json object to be passed as the second argument: nextCentinel(request, config)'
@@ -374,6 +375,44 @@ export async function nextCentinel(req: NextRequest, config?: CentinelConfig) {
       if (allowMock) {
         console.log(`[Centinel Edge] ⚠️ Mock signature accepted (dev mode): ${paymentSignature}`);
         const res = NextResponse.next();
+
+        // 1. Programmatic Callback (Non-blocking)
+        if (options?.onPaymentVerified) {
+          try {
+            const callbackPromise = options.onPaymentVerified({
+              signature: paymentSignature,
+              chain: paymentChain as 'solana' | 'base',
+              price: challenge.price,
+              path: requestedPath,
+              req,
+            });
+            if (callbackPromise instanceof Promise) {
+              callbackPromise.catch((err) => {
+                console.error('[Centinel Edge] Error in onPaymentVerified callback:', err);
+              });
+            }
+          } catch (err) {
+            console.error('[Centinel Edge] Error in onPaymentVerified callback:', err);
+          }
+        }
+
+        // 2. Webhook delivery (Non-blocking)
+        const webhookUrl = options?.webhookUrl || config.webhookUrl;
+        if (webhookUrl) {
+          const webhookSecret = process.env.CENTINEL_WEBHOOK_SECRET || JWT_SECRET;
+          const webhookPayload = {
+            event: 'payment.verified' as const,
+            timestamp: Math.floor(Date.now() / 1000),
+            payment: {
+              signature: paymentSignature,
+              chain: paymentChain as 'solana' | 'base',
+              price: challenge.price,
+              path: requestedPath,
+            },
+          };
+          dispatchWebhook(webhookUrl, webhookPayload, webhookSecret);
+        }
+
         if (challenge.model === 'per_session') {
           const sessionToken = await signJwtEdge(
             { pathPattern: requestedPath, signature: paymentSignature, chain: paymentChain },
@@ -405,6 +444,43 @@ export async function nextCentinel(req: NextRequest, config?: CentinelConfig) {
         console.log(`[Centinel Edge] Signature verified: ${paymentSignature}`);
         const res = NextResponse.next();
         
+        // 1. Programmatic Callback (Non-blocking)
+        if (options?.onPaymentVerified) {
+          try {
+            const callbackPromise = options.onPaymentVerified({
+              signature: paymentSignature,
+              chain: paymentChain as 'solana' | 'base',
+              price: challenge.price,
+              path: requestedPath,
+              req,
+            });
+            if (callbackPromise instanceof Promise) {
+              callbackPromise.catch((err) => {
+                console.error('[Centinel Edge] Error in onPaymentVerified callback:', err);
+              });
+            }
+          } catch (err) {
+            console.error('[Centinel Edge] Error in onPaymentVerified callback:', err);
+          }
+        }
+
+        // 2. Webhook delivery (Non-blocking)
+        const webhookUrl = options?.webhookUrl || config.webhookUrl;
+        if (webhookUrl) {
+          const webhookSecret = process.env.CENTINEL_WEBHOOK_SECRET || JWT_SECRET;
+          const webhookPayload = {
+            event: 'payment.verified' as const,
+            timestamp: Math.floor(Date.now() / 1000),
+            payment: {
+              signature: paymentSignature,
+              chain: paymentChain as 'solana' | 'base',
+              price: challenge.price,
+              path: requestedPath,
+            },
+          };
+          dispatchWebhook(webhookUrl, webhookPayload, webhookSecret);
+        }
+
         if (challenge.model === 'per_session') {
           const sessionToken = await signJwtEdge(
             { pathPattern: requestedPath, signature: paymentSignature, chain: paymentChain },
@@ -440,14 +516,14 @@ export async function nextCentinel(req: NextRequest, config?: CentinelConfig) {
   }
 
   let authHeader = `x402`;
-  const options: string[] = [];
+  const authOptions: string[] = [];
   if (solanaWallet) {
-    options.push(`chain="solana", address="${solanaWallet}", price="${price}", token="USDC"`);
+    authOptions.push(`chain=\"solana\", address=\"${solanaWallet}\", price=\"${price}\", token=\"USDC\"`);
   }
   if (baseWallet) {
-    options.push(`chain="base", address="${baseWallet}", price="${price}", token="USDC"`);
+    authOptions.push(`chain=\"base\", address=\"${baseWallet}\", price=\"${price}\", token=\"USDC\"`);
   }
-  authHeader += ' ' + options.join('; ');
+  authHeader += ' ' + authOptions.join('; ');
 
   const responseBody = {
     error: 'Payment Required',

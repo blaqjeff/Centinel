@@ -1,6 +1,6 @@
 {
   "name": "@ejemo/centinel",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A low-code framework to monetize bot and AI agent traffic using HTTP 402 Payment Required status code.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

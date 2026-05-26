@@ -51,7 +51,8 @@ npx centinel init
 This auto-detects your framework (Next.js or Express) and creates:
 - `centinel.config.json` — Your pricing rules and wallet addresses
 - `.env` with `JWT_SECRET` — For session token signing
-- `src/middleware.ts` — Framework-specific middleware (Next.js only)
+- `src/proxy.ts` — Framework-specific proxy file (Next.js 16+)
+- `src/middleware.ts` — Framework-specific middleware (Next.js 13–15)
 
 ### 3. Configure
 
@@ -120,7 +121,27 @@ Start your dev server. Protected routes now return `402 Payment Required` to una
 
 ### Next.js (App Router)
 
-After running `npx centinel init`, your auto-generated `src/middleware.ts` looks like:
+After running `npx centinel init`, your auto-generated proxy/middleware file looks like:
+
+**Next.js 16+ (`src/proxy.ts`):**
+
+```typescript
+import { nextCentinel } from '@ejemo/centinel/next';
+import type { NextRequest } from 'next/server';
+import centinelConfig from '../centinel.config.json';
+
+export async function proxy(request: NextRequest) {
+  return await nextCentinel(request, centinelConfig);
+}
+
+export const config = {
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
+  ],
+};
+```
+
+**Next.js 13–15 (`src/middleware.ts`):**
 
 ```typescript
 import { nextCentinel } from '@ejemo/centinel/next';
@@ -138,7 +159,7 @@ export const config = {
 };
 ```
 
-> **Note:** Uses the `@ejemo/centinel/next` subpath export, which is Edge Runtime compatible (no Node.js dependencies).
+> **Note:** The CLI auto-detects your Next.js version and generates the correct file. Next.js 16 [renamed `middleware.ts` to `proxy.ts`](https://nextjs.org/docs/messages/middleware-to-proxy). Uses the `@ejemo/centinel/next` subpath export, which is Edge Runtime compatible (no Node.js dependencies).
 
 ### Express
 

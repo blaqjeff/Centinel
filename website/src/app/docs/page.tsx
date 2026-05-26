@@ -512,7 +512,7 @@ export default function DocsPage() {
             <li>Detects whether you use a <span className={styles.inlineCode}>src/</span> directory layout</li>
             <li>Creates <span className={styles.inlineCode}>centinel.config.json</span> with example rules and placeholder wallets</li>
             <li>Generates a secure <span className={styles.inlineCode}>JWT_SECRET</span> and injects it into your <span className={styles.inlineCode}>.env</span> file</li>
-            <li>For Next.js: auto-creates a <span className={styles.inlineCode}>middleware.ts</span> (or <span className={styles.inlineCode}>.js</span>) file in the correct location</li>
+            <li>For Next.js: auto-creates a <span className={styles.inlineCode}>proxy.ts</span> (Next.js 16+) or <span className={styles.inlineCode}>middleware.ts</span> (Next.js 13–15) file in the correct location</li>
             <li>For Express: prints the exact import and middleware snippet you need</li>
           </ul>
 
@@ -584,7 +584,12 @@ export default function DocsPage() {
                 <tr>
                   <td><span className={styles.inlineCode}>src/ directory</span></td>
                   <td>Checks if a <span className={styles.inlineCode}>src/</span> folder exists</td>
-                  <td>Places middleware in <span className={styles.inlineCode}>src/middleware.ts</span> or <span className={styles.inlineCode}>middleware.ts</span></td>
+                  <td>Places proxy/middleware in <span className={styles.inlineCode}>src/proxy.ts</span> or root <span className={styles.inlineCode}>proxy.ts</span></td>
+                </tr>
+                <tr>
+                  <td><span className={styles.inlineCode}>Next.js version</span></td>
+                  <td>Reads the <span className={styles.inlineCode}>next</span> version from <span className={styles.inlineCode}>package.json</span></td>
+                  <td>Generates <span className={styles.inlineCode}>proxy.ts</span> (v16+) or <span className={styles.inlineCode}>middleware.ts</span> (v13–15)</td>
                 </tr>
               </tbody>
             </table>
@@ -603,9 +608,9 @@ export default function DocsPage() {
             A cryptographically secure 64-character hex JWT secret is generated and injected into your <span className={styles.inlineCode}>.env</span> file. If the file already exists and contains a <span className={styles.inlineCode}>JWT_SECRET</span>, it is left untouched.
           </p>
 
-          <h3>middleware.ts / middleware.js (Next.js only)</h3>
+          <h3>proxy.ts / middleware.ts (Next.js only)</h3>
           <p>
-            For Next.js projects, Centinel creates a complete Edge-compatible middleware file. It uses a catch-all matcher that routes through Centinel, which then consults <span className={styles.inlineCode}>centinel.config.json</span> to decide which paths require payment. If a middleware file already exists, Centinel prints integration instructions instead of overwriting it.
+            For Next.js projects, Centinel creates a complete Edge-compatible proxy/middleware file. The CLI auto-detects your Next.js version: for <strong>Next.js 16+</strong> it generates <span className={styles.inlineCode}>proxy.ts</span> with an exported <span className={styles.inlineCode}>proxy()</span> function, and for <strong>Next.js 13–15</strong> it generates the legacy <span className={styles.inlineCode}>middleware.ts</span>. If a proxy or middleware file already exists, Centinel prints integration instructions instead of overwriting it.
           </p>
 
           <h2>Example CLI Output</h2>
@@ -619,7 +624,8 @@ export default function DocsPage() {
 
    ✅ Created centinel.config.json
    ✅ Created .env with JWT_SECRET and RPC config
-   ✅ Created src/middleware.ts
+   ✅ Created src/proxy.ts
+      ℹ️  Next.js 16+ detected — using proxy.ts convention (replaces middleware.ts)
 
 🎉 Centinel setup complete! Next steps:
 
@@ -699,10 +705,33 @@ app.listen(3000, () => console.log('Server running on port 3000'));`}
             Use Centinel as Next.js Edge Middleware to enforce payment checks at the edge with zero cold starts.
           </p>
 
-          <h2>Auto-Scaffolded Middleware</h2>
+          <h2>Auto-Scaffolded Proxy / Middleware</h2>
           <p>
-            When you run <span className={styles.inlineCode}>npx centinel init</span> in a Next.js project, Centinel generates this middleware file for you automatically. The file is placed in <span className={styles.inlineCode}>src/middleware.ts</span> or <span className={styles.inlineCode}>middleware.ts</span> depending on your project structure:
+            When you run <span className={styles.inlineCode}>npx centinel init</span> in a Next.js project, Centinel auto-detects your Next.js version and generates the correct file. <strong>Next.js 16+</strong> uses <span className={styles.inlineCode}>proxy.ts</span> (the <a href="https://nextjs.org/docs/messages/middleware-to-proxy" target="_blank" rel="noopener noreferrer">middleware → proxy rename</a>), while <strong>Next.js 13–15</strong> uses the legacy <span className={styles.inlineCode}>middleware.ts</span>.
           </p>
+          <h3>Next.js 16+ (proxy.ts)</h3>
+          <CodeBlock
+            id="nextjs-scaffolded-proxy"
+            code={`import { nextCentinel } from '@ejemo/centinel/next';
+import type { NextRequest } from 'next/server';
+import centinelConfig from '../centinel.config.json';
+
+export async function proxy(request: NextRequest) {
+  return await nextCentinel(request, centinelConfig);
+}
+
+// Centinel runs on all routes and checks centinel.config.json
+// to decide which paths require payment. No need to list paths
+// here — just edit centinel.config.json to add, remove, or
+// change protected routes.
+export const config = {
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|.*\\\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
+  ],
+};`}
+            filename="src/proxy.ts"
+          />
+          <h3>Next.js 13–15 (middleware.ts)</h3>
           <CodeBlock
             id="nextjs-scaffolded"
             code={`import { nextCentinel } from '@ejemo/centinel/next';
@@ -725,17 +754,17 @@ export const config = {
             filename="src/middleware.ts"
           />
 
-          <h2>How the Next.js Middleware Works</h2>
+          <h2>How the Next.js Proxy / Middleware Works</h2>
           <p>
-            Unlike Express where Centinel reads the config file at runtime, the Next.js middleware imports <span className={styles.inlineCode}>centinel.config.json</span> directly as a JSON module. This is because Next.js Edge Middleware runs in a V8 isolate that doesn't have filesystem access.
+            Unlike Express where Centinel reads the config file at runtime, the Next.js proxy/middleware imports <span className={styles.inlineCode}>centinel.config.json</span> directly as a JSON module. This is because Next.js Edge Middleware runs in a V8 isolate that doesn't have filesystem access.
           </p>
           <p>
             The broad <span className={styles.inlineCode}>matcher</span> pattern catches all routes except static assets. Centinel then checks each request against your <span className={styles.inlineCode}>rules</span> array internally — unmatched paths pass through with <span className={styles.inlineCode}>NextResponse.next()</span>.
           </p>
 
-          <h2>Existing Middleware</h2>
+          <h2>Existing Proxy or Middleware File</h2>
           <p>
-            If you already have a <span className={styles.inlineCode}>middleware.ts</span> file, the CLI will <strong>not overwrite it</strong>. Instead, it prints the exact code you need to integrate Centinel alongside your existing middleware logic:
+            If you already have a <span className={styles.inlineCode}>proxy.ts</span> or <span className={styles.inlineCode}>middleware.ts</span> file, the CLI will <strong>not overwrite it</strong>. Instead, it prints the exact code you need to integrate Centinel alongside your existing logic. If you are on Next.js 16+ but still using <span className={styles.inlineCode}>middleware.ts</span>, the CLI will also warn you to migrate to <span className={styles.inlineCode}>proxy.ts</span>.
           </p>
           <CodeBlock
             id="nextjs-existing"
@@ -743,7 +772,7 @@ export const config = {
 import type { NextRequest } from 'next/server';
 import centinelConfig from '../centinel.config.json';
 
-// Inside your existing middleware function:
+// Inside your existing proxy or middleware function:
 const centinelResponse = await nextCentinel(request, centinelConfig);
 if (centinelResponse.status === 402) return centinelResponse;`}
             filename="Integration snippet"
@@ -1065,14 +1094,15 @@ app.use(centinelExpress({
 import type { NextRequest } from 'next/server';
 import centinelConfig from '../centinel.config.json';
 
-export async function middleware(request: NextRequest) {
+// Next.js 16+ uses "proxy", Next.js 13–15 uses "middleware"
+export async function proxy(request: NextRequest) {
   return await nextCentinel(request, centinelConfig, {
     onPaymentVerified: async (payment) => {
       console.log(\`Verified \${payment.chain} transaction for \${payment.path}\`);
     }
   });
 }`}
-            filename="src/middleware.ts"
+            filename="src/proxy.ts"
           />
 
           <h2>2. Webhooks (HTTP POST)</h2>

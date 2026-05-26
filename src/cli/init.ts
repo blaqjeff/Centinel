@@ -10,6 +10,7 @@ interface DetectedFramework {
   name: 'nextjs' | 'express' | 'unknown';
   usesTypescript: boolean;
   usesSrcDir: boolean;
+  nextVersion?: string;
 }
 
 function detectFramework(projectDir: string): DetectedFramework {
@@ -22,6 +23,8 @@ function detectFramework(projectDir: string): DetectedFramework {
 
   let name: DetectedFramework['name'] = 'unknown';
 
+  let nextVersion: string | undefined;
+
   if (fs.existsSync(pkgPath)) {
     try {
       const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
@@ -32,6 +35,7 @@ function detectFramework(projectDir: string): DetectedFramework {
 
       if (allDeps['next']) {
         name = 'nextjs';
+        nextVersion = allDeps['next'];
       } else if (allDeps['express']) {
         name = 'express';
       }
@@ -40,17 +44,37 @@ function detectFramework(projectDir: string): DetectedFramework {
     }
   }
 
-  return { name, usesTypescript, usesSrcDir };
+  return { name, usesTypescript, usesSrcDir, nextVersion };
+}
+
+/**
+ * Extracts the major version number from a semver or version range string.
+ * Handles formats like: "16.1.2", "^16.0.0", "~16.1.0", ">=16.0.0", "latest".
+ */
+function parseMajorVersion(versionStr?: string): number | null {
+  if (!versionStr) return null;
+  const match = versionStr.match(/(\d+)/);
+  return match ? parseInt(match[1], 10) : null;
+}
+
+/**
+ * Returns true if the detected Next.js version is 16 or greater.
+ * Defaults to false if the version cannot be determined.
+ */
+function isNext16OrGreater(version?: string): boolean {
+  const major = parseMajorVersion(version);
+  return major !== null && major >= 16;
 }
 
 // ─── Middleware Template Generators ──────────────────────────────────────────
 
-function getNextMiddlewareTS(configRelativePath: string): string {
+function getNextMiddlewareTS(configRelativePath: string, isNext16: boolean): string {
+  const fnName = isNext16 ? 'proxy' : 'middleware';
   return `import { nextCentinel } from '@ejemo/centinel/next';
 import type { NextRequest } from 'next/server';
 import centinelConfig from '${configRelativePath}';
 
-export async function middleware(request: NextRequest) {
+export async function ${fnName}(request: NextRequest) {
   return await nextCentinel(request, centinelConfig);
 }
 
@@ -65,11 +89,12 @@ export const config = {
 `;
 }
 
-function getNextMiddlewareJS(configRelativePath: string): string {
+function getNextMiddlewareJS(configRelativePath: string, isNext16: boolean): string {
+  const fnName = isNext16 ? 'proxy' : 'middleware';
   return `import { nextCentinel } from '@ejemo/centinel/next';
 import centinelConfig from '${configRelativePath}';
 
-export async function middleware(request) {
+export async function ${fnName}(request) {
   return await nextCentinel(request, centinelConfig);
 }
 
@@ -120,7 +145,8 @@ function init() {
     framework.name === 'express' ? 'Express.js' :
     'Unknown';
   const langLabel = framework.usesTypescript ? 'TypeScript' : 'JavaScript';
-  console.log(`   Detected framework:  ${frameworkLabel}`);
+  const isNext16 = isNext16OrGreater(framework.nextVersion);
+  console.log(`   Detected framework:  ${frameworkLabel}${framework.nextVersion ? ` (${framework.nextVersion})` : ''}`);
   console.log(`   Language:            ${langLabel}`);
   console.log(`   src/ directory:      ${framework.usesSrcDir ? 'Yes' : 'No'}`);
   console.log('');
@@ -221,28 +247,39 @@ JWT_SECRET="${secureSecret}"
 
 function scaffoldNextMiddleware(targetDir: string, framework: DetectedFramework) {
   const ext = framework.usesTypescript ? '.ts' : '.js';
+  const isNext16 = isNext16OrGreater(framework.nextVersion);
 
-  // Next.js middleware MUST be in one of these two locations
+  // Next.js 16+ uses proxy.ts; older versions use middleware.ts
+  // Check for both conventions in both locations
   const possibleLocations = [
+    // proxy.ts / proxy.js (Next.js 16+)
+    path.join(targetDir, 'src', `proxy${ext}`),
+    path.join(targetDir, `proxy${ext}`),
+    path.join(targetDir, 'src', `proxy${ext === '.ts' ? '.js' : '.ts'}`),
+    path.join(targetDir, `proxy${ext === '.ts' ? '.js' : '.ts'}`),
+    // middleware.ts / middleware.js (Next.js 13–15)
     path.join(targetDir, 'src', `middleware${ext}`),
     path.join(targetDir, `middleware${ext}`),
-    // Also check the opposite extension in case of mixed setups
     path.join(targetDir, 'src', `middleware${ext === '.ts' ? '.js' : '.ts'}`),
     path.join(targetDir, `middleware${ext === '.ts' ? '.js' : '.ts'}`),
   ];
 
-  const existingMiddleware = possibleLocations.find((p) => fs.existsSync(p));
+  const existingFile = possibleLocations.find((p) => fs.existsSync(p));
 
-  if (existingMiddleware) {
-    // Middleware already exists — don't overwrite, print instructions
-    console.log(`   ℹ️  Middleware file already exists: ${path.relative(targetDir, existingMiddleware)}`);
+  if (existingFile) {
+    // File already exists — don't overwrite, print integration instructions
+    const existingBasename = path.basename(existingFile);
+    const isProxyFile = existingBasename.startsWith('proxy');
+    const fnName = isProxyFile ? 'proxy' : 'middleware';
+
+    console.log(`   ℹ️  ${isProxyFile ? 'Proxy' : 'Middleware'} file already exists: ${path.relative(targetDir, existingFile)}`);
     console.log('');
-    console.log('   ┌─────────────────────────────────────────────────────────┐');
-    console.log('   │  Add Centinel to your existing middleware:              │');
-    console.log('   └─────────────────────────────────────────────────────────┘');
+    console.log(`   ┌─────────────────────────────────────────────────────────┐`);
+    console.log(`   │  Add Centinel to your existing ${fnName.padEnd(10)} file:       │`);
+    console.log(`   └─────────────────────────────────────────────────────────┘`);
     console.log('');
 
-    const configRelPath = existingMiddleware.includes(`${path.sep}src${path.sep}`)
+    const configRelPath = existingFile.includes(`${path.sep}src${path.sep}`)
       ? '../centinel.config.json'
       : './centinel.config.json';
 
@@ -251,40 +288,55 @@ function scaffoldNextMiddleware(targetDir: string, framework: DetectedFramework)
       console.log(`   import type { NextRequest } from 'next/server';`);
       console.log(`   import centinelConfig from '${configRelPath}';`);
       console.log('');
-      console.log('   // Inside your middleware function:');
+      console.log(`   // Inside your ${fnName} function:`);
       console.log('   const centinelResponse = await nextCentinel(request, centinelConfig);');
       console.log('   if (centinelResponse.status === 402) return centinelResponse;');
     } else {
       console.log(`   import { nextCentinel } from '@ejemo/centinel/next';`);
       console.log(`   import centinelConfig from '${configRelPath}';`);
       console.log('');
-      console.log('   // Inside your middleware function:');
+      console.log(`   // Inside your ${fnName} function:`);
       console.log('   const centinelResponse = await nextCentinel(request, centinelConfig);');
       console.log('   if (centinelResponse.status === 402) return centinelResponse;');
     }
+
+    // If user has middleware.ts but is on Next.js 16+, warn about migration
+    if (!isProxyFile && isNext16) {
+      console.log('');
+      console.log('   ⚠️  You are using Next.js 16+ which has renamed middleware to proxy.');
+      console.log(`      Consider renaming ${existingBasename} → ${existingBasename.replace('middleware', 'proxy')}`);
+      console.log('      and changing the exported function name from "middleware" to "proxy".');
+      console.log('      Learn more: https://nextjs.org/docs/messages/middleware-to-proxy');
+    }
+
     console.log('');
     return;
   }
 
-  // No middleware exists — create one
-  const middlewareDir = framework.usesSrcDir
+  // No file exists — create one with the appropriate convention
+  const fileName = isNext16 ? `proxy${ext}` : `middleware${ext}`;
+  const targetFileDir = framework.usesSrcDir
     ? path.join(targetDir, 'src')
     : targetDir;
-  const middlewarePath = path.join(middlewareDir, `middleware${ext}`);
+  const targetFilePath = path.join(targetFileDir, fileName);
   const configRelPath = framework.usesSrcDir ? '../centinel.config.json' : './centinel.config.json';
 
   const content = framework.usesTypescript
-    ? getNextMiddlewareTS(configRelPath)
-    : getNextMiddlewareJS(configRelPath);
+    ? getNextMiddlewareTS(configRelPath, isNext16)
+    : getNextMiddlewareJS(configRelPath, isNext16);
 
   // Ensure target directory exists
-  if (!fs.existsSync(middlewareDir)) {
-    fs.mkdirSync(middlewareDir, { recursive: true });
+  if (!fs.existsSync(targetFileDir)) {
+    fs.mkdirSync(targetFileDir, { recursive: true });
   }
 
-  fs.writeFileSync(middlewarePath, content, 'utf-8');
-  const relativePath = path.relative(targetDir, middlewarePath);
+  fs.writeFileSync(targetFilePath, content, 'utf-8');
+  const relativePath = path.relative(targetDir, targetFilePath);
   console.log(`   ✅ Created ${relativePath}`);
+
+  if (isNext16) {
+    console.log('      ℹ️  Next.js 16+ detected — using proxy.ts convention (replaces middleware.ts)');
+  }
 }
 
 // ─── Express Instructions ────────────────────────────────────────────────────

@@ -88,18 +88,38 @@ app.listen(3000, () => console.log('Server running on port 3000'));
 
 ## 4. Next.js (App Router) Integration
 
-Deploy Centinel to the edge runtime in Next.js using Next.js Middleware.
+Deploy Centinel to the edge runtime in Next.js using Next.js Proxy (v16+) or Middleware (v13–15).
 
-1. Create a `middleware.ts` in your `src/` (or project root):
+The CLI auto-detects your Next.js version and generates the correct file convention.
+
+### Next.js 16+ (proxy.ts)
+Next.js 16 renamed `middleware.ts` to `proxy.ts` and the exported function from `middleware` to `proxy`.
+Create a `proxy.ts` in your `src/` (or project root):
 ```typescript
 import { nextCentinel } from '@ejemo/centinel/next';
 import { NextRequest } from 'next/server';
+import centinelConfig from '../centinel.config.json';
 
-export function middleware(request: NextRequest) {
-  return nextCentinel(request);
+export async function proxy(request: NextRequest) {
+  return await nextCentinel(request, centinelConfig);
 }
 
-// Map the routes you want Centinel to protect
+export const config = {
+  matcher: ['/api/data', '/premium/:path*'],
+};
+```
+
+### Next.js 13–15 (middleware.ts)
+Create a `middleware.ts` in your `src/` (or project root):
+```typescript
+import { nextCentinel } from '@ejemo/centinel/next';
+import { NextRequest } from 'next/server';
+import centinelConfig from '../centinel.config.json';
+
+export async function middleware(request: NextRequest) {
+  return await nextCentinel(request, centinelConfig);
+}
+
 export const config = {
   matcher: ['/api/data', '/premium/:path*'],
 };

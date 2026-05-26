@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "centinel": "./dist/cli/init.js"
+    "centinel": "dist/cli/init.js"
   },
   "exports": {
     ".": {
